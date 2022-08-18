@@ -8,6 +8,9 @@ import android.net.Uri;
 import android.text.format.DateUtils;
 import android.util.Log;
 
+import net.fortuna.ical4j.model.Calendar;
+import net.fortuna.ical4j.model.component.VEvent;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -43,92 +46,88 @@ import java.util.List;
 
 public class CalendarHelper {
 
-    public static HashMap<String, List<CalendarEvent>> readCalendar(Context context) {
+    public static Calendar readCalendar(Context context) {
         return readCalendar(context, 1, 0);
     }
 
     // Use to specify specific the time span
-    public static HashMap<String, List<CalendarEvent>> readCalendar(Context context, int days, int hours) {
+    public static Calendar readCalendar(Context context, int days, int hours) {
 
         ContentResolver contentResolver = context.getContentResolver();
 
-
-         Cursor cursor = contentResolver.query(Uri.parse("content://com.android.calendar/events"),
+        try (Cursor cursor = contentResolver.query(Uri.parse("content://com.android.calendar/events"),
          new String[]{ "calendar_id", "title", "description", "dtstart", "dtend", "eventLocation" },
-         null, null, null);
+         null, null, null)) {
 
-        // Create a set containing all of the calendar IDs available on the phone
-        HashSet<String> calendarIds = getCalenderIds(cursor);
+            // Create a set containing all of the calendar IDs available on the phone
+            HashSet<String> calendarIds = getCalenderIds(cursor);
 
-        // Create a hash map of calendar ids and the events of each id
-        HashMap<String, List<CalendarEvent>> eventMap = new HashMap<String, List<CalendarEvent>>();
+            Calendar calendar = new Calendar();
 
-        // Loop over all of the calendars
-        for (String id : calendarIds) {
+            // Loop over all of the calendars
+            for (String id : calendarIds) {
 
-            // Create a builder to define the time span
-            Uri.Builder builder = Uri.parse("content://com.android.calendar/instances/when").buildUpon();
-            long now = new Date().getTime();
+                // Create a builder to define the time span
+                Uri.Builder builder = Uri.parse("content://com.android.calendar/instances/when").buildUpon();
+                long now = new Date().getTime();
 
-            // create the time span based on the inputs
-            ContentUris.appendId(builder, now - (DateUtils.DAY_IN_MILLIS * days) - (DateUtils.HOUR_IN_MILLIS * hours));
-            ContentUris.appendId(builder, now + (DateUtils.DAY_IN_MILLIS * days) + (DateUtils.HOUR_IN_MILLIS * hours));
+                // create the time span based on the inputs
+                ContentUris.appendId(builder, now - (DateUtils.DAY_IN_MILLIS * days) - (DateUtils.HOUR_IN_MILLIS * hours));
+                ContentUris.appendId(builder, now + (DateUtils.DAY_IN_MILLIS * days) + (DateUtils.HOUR_IN_MILLIS * hours));
 
-            // Create an event cursor to find all events in the calendar
-            Cursor eventCursor = contentResolver.query(builder.build(),
-                    new String[]  { "title", "begin", "end", "allDay"}, "Events.calendar_id=" + id,
-                    null, "startDay ASC, startMinute ASC");
+                // Create an event cursor to find all events in the calendar
+                Cursor eventCursor = contentResolver.query(builder.build(),
+                        new String[]{"title", "begin", "end", "allDay"}, "Events.calendar_id=" + id,
+                        null, "startDay ASC, startMinute ASC");
 
-            System.out.println("eventCursor count="+eventCursor.getCount());
+                System.out.println("eventCursor count=" + eventCursor.getCount());
 
-            // If there are actual events in the current calendar, the count will exceed zero
-            if(eventCursor.getCount()>0)
-            {
+                // If there are actual events in the current calendar, the count will exceed zero
+                if (eventCursor.getCount() > 0) {
 
-                // Create a list of calendar events for the specific calendar
-                List<CalendarEvent> eventList = new ArrayList<CalendarEvent>();
+                    // Move to the first object
+                    eventCursor.moveToFirst();
 
-                // Move to the first object
-                eventCursor.moveToFirst();
+                    // Create an object of CalendarEvent which contains the title, when the event begins and ends,
+                    // and if it is a full day event or nota
+                    VEvent event = loadEvent(eventCursor);
 
-                // Create an object of CalendarEvent which contains the title, when the event begins and ends,
-                // and if it is a full day event or not
-                CalendarEvent ce = loadEvent(eventCursor);
+                    // Adds the first object to the list of events
+                    // TODO seperate the events per source calendar, somehow
+                    calendar.getComponents().add(event);
 
-                // Adds the first object to the list of events
-                eventList.add(ce);
+                    // While there are more events in the current calendar, move to the next instance
+                    while (eventCursor.moveToNext()) {
 
-                System.out.println(ce.toString());
+                        // Adds the object to the list of events
+                        event = loadEvent(eventCursor);
+                        calendar.getComponents().add(event);
 
-                // While there are more events in the current calendar, move to the next instance
-                while (eventCursor.moveToNext())
-                {
+                    }
 
-                    // Adds the object to the list of events
-                    ce = loadEvent(eventCursor);
-                    eventList.add(ce);
-
-                    System.out.println(ce.toString());
+                    //eventMap.put(id, eventList);
 
                 }
-
-                Collections.sort(eventList);
-                eventMap.put(id, eventList);
-
-                System.out.println(eventMap.keySet().size() + " " + eventMap.values());
-
             }
-        }
 
-        return eventMap;
+            return calendar;
+        }
     }
 
     // Returns a new instance of the calendar object
-    private static CalendarEvent loadEvent(Cursor csr) {
-        return new CalendarEvent(csr.getString(0),
-                new Date(csr.getLong(1)),
-                new Date(csr.getLong(2)),
-                !csr.getString(3).equals("0"));
+    private static VEvent loadEvent(Cursor csr) {
+        // "title", "begin", "end", "allDay"
+        String title = csr.getString(0);
+        Date begin = new Date(csr.getLong(1));
+        Date end = new Date(csr.getLong(2));
+
+        // TODO use allDay
+        boolean allDay = !csr.getString(3).equals("0");
+
+        return new VEvent(
+                new net.fortuna.ical4j.model.Date(begin),
+                new net.fortuna.ical4j.model.Date(end),
+                title);
     }
 
     // Creates the list of calendar ids and returns it in a set

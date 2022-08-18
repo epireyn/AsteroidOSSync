@@ -22,18 +22,21 @@ package org.asteroidos.sync.connectivity;
 
 import android.content.Context;
 
+import net.fortuna.ical4j.data.CalendarOutputter;
+import net.fortuna.ical4j.model.Calendar;
+
 import org.asteroidos.sync.asteroid.IAsteroidDevice;
 import org.asteroidos.sync.utils.AsteroidUUIDS;
-import org.asteroidos.sync.utils.CalendarEvent;
 import org.asteroidos.sync.utils.CalendarHelper;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.UUID;
 
 public class CalendarService implements IConnectivityService {
-    private Context mCtx;
-    private IAsteroidDevice mDevice;
+    private final Context mCtx;
+    private final IAsteroidDevice mDevice;
 
     public CalendarService(Context ctx, IAsteroidDevice device) {
         mCtx = ctx;
@@ -52,20 +55,24 @@ public class CalendarService implements IConnectivityService {
     }
 
     private void updateCalendar(){
-        HashMap<String, List<CalendarEvent>> calendar = getCalendar();
-        mDevice.send(AsteroidUUIDS.CALENDAR_WRT_UUID, calToICS(calendar), CalendarService.this);
+        Calendar calendar = getCalendar();
+        mDevice.send(AsteroidUUIDS.CALENDAR_WRT_UUID, serializeCalendar(calendar), CalendarService.this);
     }
 
-    private byte[] calToICS(HashMap<String, List<CalendarEvent>> calendar) {
-        byte[] ics = null;
-
-        // TODO convert calendar data to iCal/ICS and encode in bytes
-        // Which encoding?
-
-        return ics;
+    private byte[] serializeCalendar(Calendar calendar) {
+        CalendarOutputter outputter = new CalendarOutputter();
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+            outputter.output(calendar, baos);
+            return baos.toByteArray();
+        } catch (IOException e) {
+            // TODO report error to user somehow or throw
+            // We really should be throwing this error.
+            e.printStackTrace();
+            return null;
+        }
     }
 
-    private HashMap<String, List<CalendarEvent>> getCalendar(){
+    private Calendar getCalendar(){
         return CalendarHelper.readCalendar(mCtx);
     }
 

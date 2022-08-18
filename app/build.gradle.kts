@@ -63,5 +63,5 @@ dependencies {
     implementation("org.osmdroid:osmdroid-android:6.1.16")
     implementation("no.nordicsemi.android.support.v18:scanner:1.6.0")
     implementation("no.nordicsemi.android:ble:2.7.2")
-    implementation("org.mnode.ical4j:ical4j:2.0.0")
+    implementation("org.mnode.ical4j:ical4j:3.2.4")
 }
