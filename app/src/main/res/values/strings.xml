@@ -77,4 +77,6 @@
     <string name="location_disabled_title">Location disabled</string>
     <string name="intro_slide6_title">Phone/device Notifications</string>
     <string name="intro_slide6_subtitle">To show the current connection state of the watch.</string>
+    <string name="intro_slide_calendar_title">Calendar</string>
+    <string name="intro_slide_calendar_subtitle">To sync your calendar we need access to it.</string>
 </resources>
